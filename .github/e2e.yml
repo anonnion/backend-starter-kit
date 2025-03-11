@@ -1,0 +1,71 @@
+name: E2E Tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: testing_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo, pdo_mysql, xml
+          tools: composer:v2
+
+      - name: Install Backend Dependencies
+        run: composer install --prefer-dist --no-progress --no-suggest
+
+      - name: Install Frontend Dependencies
+        run: npm install && npx playwright install  --with-deps
+
+      - name: Copy .env
+        run: cp .env.ci .env
+
+      - name: Generate App Key
+        run: php artisan key:generate
+
+      - name: Run Migrations
+        run: php artisan migrate --env=testing --force
+
+      - name: Start Laravel Server
+        run: php artisan serve --host=0.0.0.0 --port=8000 &
+
+      - name: Run Playwright Tests
+        run: |
+          npx playwright test --project=chromium
+          npx playwright test --project=iphone12
+
+      - name: Upload Playwright Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-results
+          path: test-results
+  

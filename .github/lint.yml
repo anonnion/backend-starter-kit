@@ -1,0 +1,43 @@
+name: Linting & Code Quality
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer, phpstan, php-cs-fixer
+          coverage: none
+
+      - name: Install Dependencies
+        run: composer install --no-progress --no-suggest --prefer-dist
+
+      - name: Run PHPStan (Static Analysis)
+        run: vendor/bin/phpstan analyse --memory-limit=512M
+
+      - name: Run PHP CS Fixer (Code Styling)
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+
+      - name: Lint JavaScript & TypeScript
+        run: |
+          npm install
+          npm run lint
+
+      - name: Check Commit Message Format
+        uses: wagoid/commitlint-github-action@v5
